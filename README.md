@@ -21,8 +21,8 @@ If you want, you can use this repo to find out what are your youtube patterns. J
 - After you have downloaded the file, uncompress it
 - run the following command - `python3 main.py -f convert -d *<file_name.json>*`
 - This method will convert the json file into a csv file. It will also create other columns that will be useful later
-![alt text](![alt text](https://github.com/FilipeGood/Youtube-Most-Viewed/blob/main/Readme%20Images/top_10_titles.jpg))
-![alt text](![alt text](https://github.com/FilipeGood/Youtube-Most-Viewed/blob/main/Readme%20Images/views_by_day_of_week.jpg))
+
+
 
 
 
@@ -30,6 +30,10 @@ If you want, you can use this repo to find out what are your youtube patterns. J
 - Run the following command - `python3 main.py -f create`
 - This will create multiple xlsx file and multiple graphs
 - You can use the xlsx files and the graphs to explore your youtube usage
+
+
+![alt text](![alt text](https://github.com/FilipeGood/Youtube-Most-Viewed/blob/main/Readme%20Images/top_10_titles.jpg))
+![alt text](![alt text](https://github.com/FilipeGood/Youtube-Most-Viewed/blob/main/Readme%20Images/views_by_day_of_week.jpg))
 
 
 
