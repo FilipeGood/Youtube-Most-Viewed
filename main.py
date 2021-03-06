@@ -8,39 +8,116 @@ from matplotlib import pyplot as plt
 import pafy
 import numpy as np
 from datetime import datetime
+from os import path
+
 # CONVERT - python3 main.py -f convert -d histórico_de_visualizações_3Jan.json
-# JOIN -  python3 main.py -f join -d histórico_de_visualizações_3Jan.jsonArguments:  join ,  histórico_de_visualizações_3Jan.json
+# JOIN -  python3 main.py -f join -d histórico_de_visualizações_3Jan.csv
 # CREATE FILES - python3 main.py -f create
 
-
-
-
-"""
-#! Download youtube data:
-    - http://google.com/takeout
-
-# ? TODO
-    - File:
-        - Minutes by day
-    - Graphs
-        - Titles and legends in graphs
-    - "Interface" like this: https://www.youtube.com/watch?v=hkhyKJj28Ac&list=WL&index=18&ab_channel=KalleHallden
-"""
 
 
 ap = argparse.ArgumentParser()
 ap.add_argument("-f", "--function", required=True, help="Function to execute: \n\tjoin - Join historic data \n\tcreate - Create files")
 ap.add_argument("-d", "--data", required=False,
 	help="path to historic data")
-ap.add_argument("-n", "--duration", required=False, help="If you DON'T want to create the duration cols -n no")
 args = vars(ap.parse_args())
 
 
+# pip3 install matplotlib
+# pip3 install pafy
+# pip3 install youtube-dl
+
+# Convert file from json to csv
+
+def convert_json_to_dataframe(data):
+    """
+        Converts the original json file to a csv file with the correct columns
+
+        data: json historical data
+    """
+    new_list = list()
+    for obj in data:
+        if 'titleUrl' not in  obj:
+            continue
+
+        header = obj['header']
+        title = obj['title']
+        title_url = obj['titleUrl']
+        channel = ''
+        if 'subtitles' in obj:
+            channel = obj['subtitles'][0]['name']
+        time = obj['time']
+
+        new_list.append([header, title, title_url, channel, time])
+
+    df = pd.DataFrame(new_list, columns=['header', 'title', 'title_url', 'channel', 'time'])
+
+    df['duration_sec'] = np.nan
+    df['duration_min'] = np.nan
+
+    print('Going to create the duration columns. This might take a while....')
+    df = create_duration_col(df)
+    return df
+
+def create_duration_col(df):
+    """
+        Uses pafy lib to get the duration of each video
+
+        df: pandas dataframe with the historical data
+    """
+    seconds = list()
+    minutes = list()
+    for index, row in df.iterrows():
+        try:
+            url = row['title_url']
+            video = pafy.new(url)
+            duration =  datetime.strptime(video.duration, '%H:%M:%S')
+
+            seconds.append(duration.minute*60 + duration.second )
+            minutes.append(duration)
+        except:
+            seconds.append(None)
+            minutes.append(None)
+            print('Invalid URL: ', row['title_url'])
+
+    df['duration_sec']  = seconds
+    df['duration_min'] = minutes
+
+    return df
 
 
-def create_files(df):
+# Join with previous historical data
+def join_historic_data(df):
+    """
+        Joins new historic data with the previous data.
+        Then, saves the new data.
+        ! Assumes that the previous processed historical data is saved on the file Historic_data.csv
+
+        df: pandas dataframe with the new data
+    """
+
+    prev_hist = pd.read_csv('Historic_data.csv') # get previous data
+    prev_date = prev_hist.time.values[0]
+    df = df[(df.time > prev_date)]  # only select the records that have a date higher than the previous date
+
+    df = pd.concat([df, prev_hist])
+    df.to_csv('Historic_data.csv', index=False)
+    return df
+
+# Create files and graphs
+def create_files_with_aggregates(df):
+    """
+        This method groups and aggregates the data by multiple columns and saves the
+        resulting dataframes
+
+        df: pandas dataframe
+    """
     # Save data grouped by title and channel
-    df.groupby(['title', 'channel']).size().reset_index(name='counter').sort_values(by=['counter'], ascending=False).to_csv('views_by_title&channel.xlsx', index=False)
+    df.groupby(['title', 'channel'])\
+            .size()\
+            .reset_index(name='counter')\
+            .sort_values(by=['counter'], ascending=False)\
+            .to_csv('views_by_title&channel.xlsx', index=False)\
 
 
     # Views by channel
@@ -61,9 +138,10 @@ def create_files(df):
     df['day_of_week'] = df['day'].dt.day_name()
     df.groupby(['day_of_week']).size().reset_index(name='counter').to_csv('views_by_day_week.xlsx', index=False)
 
-    create_graphs(df)
+    create_plots(df)
+    return df
 
-def create_graphs(df):
+def create_plots(df):
     # fig_size(width, height)
 
     # Top 10 most viewed channels
@@ -202,112 +280,37 @@ def create_graphs(df):
             ax.annotate(str(p.get_height()), (p.get_x()+p.get_width()/2, p.get_height()*1.005), ha='center', fontweight='heavy',color='b', fontsize=11)
         plt.savefig('top_20_days_most_min.jpg')
 
-def convert_json_to_dataframe(data):
-    """
-        Converts the original json file to a csv file with the correct columns
-    """
-    new_list = list()
-    for obj in data:
-        if 'titleUrl' not in  obj:
-            continue
-
-        header = obj['header']
-        title = obj['title']
-        title_url = obj['titleUrl']
-        channel = ''
-        if 'subtitles' in obj:
-            channel = obj['subtitles'][0]['name']
-        time = obj['time']
-
-        new_list.append([header, title, title_url, channel, time])
-
-    df['duration_sec'] = np.nan
-    df['duration_min'] = np.nan
-    df = pd.DataFrame(new_list, columns=['header', 'title', 'title_url', 'channel', 'time'])
-    return df
-
-def create_duration_col(df):
-    seconds = list()
-    minutes = list()
-    for index, row in df.iterrows():
-        try:
-            url = row['title_url']
-            video = pafy.new(url)
-            duration =  datetime.strptime(video.duration, '%H:%M:%S')
-
-            seconds.append(duration.minute*60 + duration.second )
-            minutes.append(duration)
-        except:
-            seconds.append(None)
-            minutes.append(None)
-            print('Upssss: ', row['title_url'])
-
-    df['duration_sec']  = seconds
-    df['duration_min'] = minutes
-
-    return df
-
-
-
-def join_historic_data(df):
-    """
-        Joins new historic data with the previous data.
-        Then, saves the new data
-    """
-    prev_hist = pd.read_csv('Historic_data.csv')
-    prev_date = prev_hist.time.values[0]
-    df = df[(df.time > prev_date)]
-
-    if args['duration'] == "no":
-        df['duration_sec'] = np.nan
-        df['duration_min'] = np.nan
-    else:
-        # create duration columns of the new dataframe
-        # it is better to do here than in the function convert_json_to_dataframe because the dataframe is smaller
-        df = create_duration_col(df)
-    df = pd.concat([df, prev_hist])
-    df.to_csv('Historic_data.csv', index=False)
-    return df
-
-def save_historic_data_as_csv(df):
-    """
-        ? Not being used!
-        Just a json to csv converter
-    """
-    path = args['data']
-    path = path.replace('.json', '')
-    return df.to_csv(f'{path}.csv', index=False)
 
 def main():
     f = args['function']
     path = args['data']
-    print('Arguments: ', f, ', ', path)
     if f == 'convert':
         if path is None:
             print('Error: you have to provide the path for the new file!')
             return
         with open(path) as json_file:
             data = json.load(json_file)
-
         df = convert_json_to_dataframe(data)
         df.to_csv(path.replace('json', 'csv'), index=False)
+        if not path.exists("Historic_data.csv"):
+            df.to_csv("test.csv", index=False)
+    elif f == 'create':
+        if path is None:
+            print('Error: you have to provide the path for the csv file!')
+            return
+        df = pd.read_csv('test.csv')
+        create_files_with_aggregates(df)
     elif f == 'join':
         if path is None:
-            print('Error: you have to provide the path for the new file!')
+            print('Error: you have to provide the path for the new csv file!')
             return
+        df = pd.read_csv(path) # new data
+        join_historic_data(df)
+    else:
+        print('Invalid function input!')
+        return
 
-        df = pd.read_json(path)
-        df = join_historic_data(df)
-    elif f == 'create':
-        df = pd.read_csv('Historic_data.csv')
-        create_files(df)
 
-    return None
 
 if __name__ == "__main__":
     main()
-    """
-    df = pd.read_csv('Historic_data.csv')
-    df = create_duration_col(df)
-    df.to_csv('Historic_data1.csv', index=False)
-    """
