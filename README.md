@@ -35,7 +35,7 @@ If you want, you can use this repo to find out what are your youtube patterns. J
 
 ### Join previous historic data with new one
 - If you have a new historica data file, you can join the old one with the new one 
-- Run the following command -  `python3 main.py -f join -d *<new_file_name.json>*`
+- Run the following command -  `python3 main.py -f join -d *<new_file_name.csv>*`
 
 
 
